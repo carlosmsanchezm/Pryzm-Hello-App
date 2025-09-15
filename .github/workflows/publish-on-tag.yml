@@ -17,7 +17,7 @@ jobs:
       - uses: actions/checkout@v4
 
       # Enable binfmt (qemu) for cross-arch builds
-      - name: Enable binfmt (qemu) for cross-arch builds
+      - name: Enable binfmt (qemu)
         run: sudo podman run --rm --privileged docker.io/tonistiigi/binfmt --install all
 
       - name: Login to GHCR (Podman)
@@ -49,28 +49,28 @@ jobs:
             latest
           containerfiles: |
             ./Dockerfile
-          context: .
-          # Build both architectures and create a manifest list
           platforms: linux/amd64,linux/arm64
+          archs: amd64,arm64
           labels: |
             org.opencontainers.image.title=hello-app
             org.opencontainers.image.source=https://github.com/${{ github.repository }}
             org.opencontainers.image.revision=${{ github.sha }}
             org.opencontainers.image.version=${{ steps.semver.outputs.version }}
 
-      - name: Push (Podman)
+      - name: Push (Podman) with PAT
+        id: push
         uses: redhat-actions/push-to-registry@v2
         with:
           registry: ghcr.io
           image: ${{ steps.build.outputs.image }}
           tags: ${{ steps.build.outputs.tags }}
           username: ${{ github.repository_owner }}
-          password: ${{ secrets.GITHUB_TOKEN }}
+          password: ${{ secrets.GHCR_TOKEN }}
 
       # Print manifest digest for release
       - name: Print manifest digest for vX.Y.Z
         run: |
-          echo "RELEASE_MANIFEST_DIGEST=$(cat ghcr.io-${{ github.repository_owner }}-hello-app-v${{ steps.semver.outputs.version }}_digest.txt || true)"
+          ls -1 *_digest.txt || true
 
       - name: Trivy scan (remote image)
         uses: aquasecurity/trivy-action@0.33.1
