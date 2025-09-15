@@ -44,7 +44,6 @@ jobs:
           containerfiles: |
             ./Dockerfile
           platforms: linux/amd64,linux/arm64
-          archs: amd64,arm64
 
       # Push with Podman using PAT
       - name: Push to GHCR (Podman) with PAT
