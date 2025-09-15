@@ -13,7 +13,6 @@ permissions:
   packages: write
 
 env:
-  REGISTRY: ghcr.io
   IMAGE: ${{ github.repository_owner }}/hello-app
   TAG: sha-${{ github.sha }}
 
@@ -24,11 +23,11 @@ jobs:
       - uses: actions/checkout@v4
 
       # Enable binfmt (qemu) for cross-arch builds
-      - name: Enable binfmt (qemu) for cross-arch builds
+      - name: Enable binfmt (qemu)
         run: sudo podman run --rm --privileged docker.io/tonistiigi/binfmt --install all
 
-      # Login to GHCR using Podman (rootless/daemonless)
-      - name: Podman login (GHCR)
+      # Login to GHCR using Podman for build pulls
+      - name: Login (Podman) to GHCR for build pulls
         uses: redhat-actions/podman-login@v1
         with:
           registry: ghcr.io
@@ -40,27 +39,31 @@ jobs:
         id: build
         uses: redhat-actions/buildah-build@v2
         with:
-          image: ${{ env.REGISTRY }}/${{ env.IMAGE }}
+          image: ${{ env.IMAGE }}
           tags: latest ${{ env.TAG }}
           containerfiles: |
             ./Dockerfile
-          context: .
-          # Build both architectures and create a manifest list
           platforms: linux/amd64,linux/arm64
 
-      # Push with Podman
-      - name: Push to GHCR (Podman)
+      # Push with Podman using PAT
+      - name: Push to GHCR (Podman) with PAT
         id: push
         uses: redhat-actions/push-to-registry@v2
         with:
+          registry: ghcr.io
           image: ${{ steps.build.outputs.image }}
           tags: ${{ steps.build.outputs.tags }}
-          registry: ghcr.io
           username: ${{ github.repository_owner }}
-          password: ${{ secrets.GITHUB_TOKEN }}
+          password: ${{ secrets.GHCR_TOKEN }}
 
-      # Scan the remote image in GHCR (no local Podman socket needed)
-      - name: Trivy scan (image in GHCR)
+      # Print manifest digest for later use
+      - name: Print manifest digest (latest)
+        run: |
+          ls -1 *_digest.txt || true
+          echo "LATEST_MANIFEST_DIGEST=$(cat ghcr.io-${{ github.repository_owner }}-hello-app-latest_digest.txt || true)"
+
+      # Scan the remote image in GHCR with authentication
+      - name: Trivy scan (remote in GHCR by tag)
         uses: aquasecurity/trivy-action@0.33.1
         with:
           image-ref: ghcr.io/${{ env.IMAGE }}:${{ env.TAG }}
@@ -72,4 +75,4 @@ jobs:
           exit-code: '1'
         env:
           TRIVY_USERNAME: ${{ github.repository_owner }}
-          TRIVY_PASSWORD: ${{ secrets.GITHUB_TOKEN }}
+          TRIVY_PASSWORD: ${{ secrets.GHCR_TOKEN }}

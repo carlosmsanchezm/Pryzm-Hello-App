@@ -8,7 +8,6 @@ permissions:
   packages: write
 
 env:
-  REGISTRY: ghcr.io
   IMAGE: ${{ github.repository_owner }}/hello-app
 
 jobs:
@@ -18,7 +17,7 @@ jobs:
       - uses: actions/checkout@v4
 
       # Enable binfmt (qemu) for cross-arch builds
-      - name: Enable binfmt (qemu) for cross-arch builds
+      - name: Enable binfmt (qemu)
         run: sudo podman run --rm --privileged docker.io/tonistiigi/binfmt --install all
 
       - name: Login to GHCR (Podman)
@@ -42,7 +41,7 @@ jobs:
         id: build
         uses: redhat-actions/buildah-build@v2
         with:
-          image: ${{ env.REGISTRY }}/${{ env.IMAGE }}
+          image: ${{ env.IMAGE }}
           tags: |
             v${{ steps.semver.outputs.version }}
             v${{ steps.semver.outputs.major }}.${{ steps.semver.outputs.minor }}
@@ -50,8 +49,6 @@ jobs:
             latest
           containerfiles: |
             ./Dockerfile
-          context: .
-          # Build both architectures and create a manifest list
           platforms: linux/amd64,linux/arm64
           labels: |
             org.opencontainers.image.title=hello-app
@@ -59,21 +56,31 @@ jobs:
             org.opencontainers.image.revision=${{ github.sha }}
             org.opencontainers.image.version=${{ steps.semver.outputs.version }}
 
-      - name: Push (Podman)
+      - name: Push (Podman) with PAT
+        id: push
         uses: redhat-actions/push-to-registry@v2
         with:
+          registry: ghcr.io
           image: ${{ steps.build.outputs.image }}
           tags: ${{ steps.build.outputs.tags }}
-          registry: ghcr.io
           username: ${{ github.repository_owner }}
-          password: ${{ secrets.GITHUB_TOKEN }}
+          password: ${{ secrets.GHCR_TOKEN }}
+
+      # Print manifest digest for release
+      - name: Print manifest digest for vX.Y.Z
+        run: |
+          ls -1 *_digest.txt || true
 
       - name: Trivy scan (remote image)
         uses: aquasecurity/trivy-action@0.33.1
         with:
           image-ref: ghcr.io/${{ env.IMAGE }}:v${{ steps.semver.outputs.version }}
+          format: 'table'
+          vuln-type: 'os,library'
+          scanners: 'vuln'
           severity: 'HIGH,CRITICAL'
+          ignore-unfixed: false
           exit-code: '1'
         env:
           TRIVY_USERNAME: ${{ github.repository_owner }}
-          TRIVY_PASSWORD: ${{ secrets.GITHUB_TOKEN }}
+          TRIVY_PASSWORD: ${{ secrets.GHCR_TOKEN }}
