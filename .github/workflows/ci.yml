@@ -13,7 +13,6 @@ permissions:
   packages: write
 
 env:
-  REGISTRY: ghcr.io
   IMAGE: ${{ github.repository_owner }}/hello-app
   TAG: sha-${{ github.sha }}
 
@@ -40,7 +39,7 @@ jobs:
         id: build
         uses: redhat-actions/buildah-build@v2
         with:
-          image: ${{ env.REGISTRY }}/${{ env.IMAGE }}
+          image: ${{ env.IMAGE }}
           tags: latest ${{ env.TAG }}
           containerfiles: |
             ./Dockerfile
@@ -53,10 +52,16 @@ jobs:
         id: push
         uses: redhat-actions/push-to-registry@v2
         with:
+          registry: ghcr.io
           image: ${{ steps.build.outputs.image }}
           tags: ${{ steps.build.outputs.tags }}
           username: ${{ github.repository_owner }}
           password: ${{ secrets.GITHUB_TOKEN }}
+
+      # Print manifest digest for later use
+      - name: Print manifest digest
+        run: |
+          echo "LATEST_MANIFEST_DIGEST=$(cat ghcr.io-${{ github.repository_owner }}-hello-app-latest_digest.txt || true)"
 
       # Scan the remote image in GHCR (no local Podman socket needed)
       - name: Trivy scan (image in GHCR)
