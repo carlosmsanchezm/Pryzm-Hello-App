@@ -40,7 +40,7 @@ jobs:
         id: build
         uses: redhat-actions/buildah-build@v2
         with:
-          image: ${{ env.IMAGE }}
+          image: ${{ env.REGISTRY }}/${{ env.IMAGE }}
           tags: latest ${{ env.TAG }}
           containerfiles: |
             ./Dockerfile
@@ -55,9 +55,6 @@ jobs:
         with:
           image: ${{ steps.build.outputs.image }}
           tags: ${{ steps.build.outputs.tags }}
-          registry: ${{ env.REGISTRY }}
-          username: ${{ github.repository_owner }}
-          password: ${{ secrets.GITHUB_TOKEN }}
 
       # Scan the remote image in GHCR (no local Podman socket needed)
       - name: Trivy scan (image in GHCR)
