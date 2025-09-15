@@ -62,8 +62,8 @@ jobs:
           ls -1 *_digest.txt || true
           echo "LATEST_MANIFEST_DIGEST=$(cat ghcr.io-${{ github.repository_owner }}-hello-app-latest_digest.txt || true)"
 
-      # Scan the remote image in GHCR (no local Podman socket needed)
-      - name: Trivy scan (image in GHCR)
+      # Scan the remote image in GHCR with authentication
+      - name: Trivy scan (remote in GHCR by tag)
         uses: aquasecurity/trivy-action@0.33.1
         with:
           image-ref: ghcr.io/${{ env.IMAGE }}:${{ env.TAG }}
@@ -75,4 +75,4 @@ jobs:
           exit-code: '1'
         env:
           TRIVY_USERNAME: ${{ github.repository_owner }}
-          TRIVY_PASSWORD: ${{ secrets.GITHUB_TOKEN }}
+          TRIVY_PASSWORD: ${{ secrets.GHCR_TOKEN }}
